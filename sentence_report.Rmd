@@ -1,0 +1,188 @@
+---
+title: "Sentence-level Sentiment Analysis of [A Study in Scarlet]"
+author: "XihaoCao"
+date: "2021/12/8"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(gutenbergr)
+library(magrittr)
+library(tidyverse)
+library(tnum)
+library(tidytext)
+library(RColorBrewer)
+library(wordcloud)
+library(sentimentr)
+library(grid)
+library(gtable)
+library(gridExtra)
+library(reshape2)
+```
+
+
+# Introduction
+A Study in Scarlet is an 1887 detective novel written by Arthur Conan Doyle. The story marks the first appearance of Sherlock Holmes and Dr. Watson. Conan Doyle wrote the novel at the age of 27, and the story attracted little public interest when it first appeared. But after Sherlock Holmes and Dr. Watson become one of the most famous and iconic literary detective characters, this story gets more and more popular. One thing needs notice is that this book is one of only four full-length novels in the original canon.
+\
+\
+
+# Synopsis
+The novel is split into two quite separate halves. The first part is told in first person by Sherlock Holmes' friend Dr Watson, and describes his introduction in 1881 to Holmes through a mutual friend and the first mystery in which he followed Holmes' investigations. The mystery revolves around a corpse found at a derelict house in Briton, London with the word "RACHE" scrawled in blood on the wall beside the body. After detailed investigation and thorough detection, Holmes 
+gets the clues and reveal the story behind the crime which is told in the second part of the book. The second half of the story is called The Country of the Saints and jumps to the United States of America and the Mormon community, and incorporating a depiction of the Danites, including an appearance by Brigham Young in a somewhat villainous context. It is told in a third person narrative style, with an omniscient narrator, before returning in the last two chapters to Watson's account of Holmes' investigation, and then Holmes own explanation of his solution. In these two chapters the relationship between the two halves of the novel becomes apparent. The motive for the crime is essentially one of lost love and revenge.
+\
+\
+
+# Data cleaning and organization
+I download the book from the Gutenberg Book Project manually, and the data is a txt file containing all plain text. Then I
+read the data into a larger character vector using the readLine function, and each element is a single sentence. Then I upload the sentence-level data into the tnum server for future use.
+
+```{r, echo = F, warning = F, message = F}
+# download the book
+data <- gutenberg_download(c(244))
+# make the text tidy (have excluded stop words)
+scarlet <- data %>%
+  mutate(linenumber = row_number(),
+         chapter = cumsum(str_detect(text, regex("^chapter [\\divxlc]",
+                                                 ignore_case = TRUE)))) %>%
+  unnest_tokens(word, text) %>%
+  anti_join(stop_words)
+```
+\
+
+# Check server status
+There are multiple numspaces in the server, I need to set the working space to test2, and check whether my data is well stored.
+```{r, echo=F, warning=F}
+##create my own branch for the text into the mssp server
+source('Book2TN-v6A-1.R')
+print('The following are available spaces in the server')
+tnum.authorize('mssp1.bu.edu') # get the access of the server
+tnum.setSpace("test2") # use the test2 space of the server
+scarlet_txt <- readLines("a_study_in_scarlet.txt")
+path_list <- tnum.getDBPathList(taxonomy = 'subject', level = 1) # check the branch in server
+
+# check whether my brach is in the server
+if ('xihao' %in% path_list) {
+  print('Successfully find xihao\'s branches in the MSSP tnum server')
+}
+
+# create a function that can query and transfer the result to a dataframe
+tqury <- function(word, n) {
+  q1 <- tnum.query(query = word, max = n)
+  return(tnum.objectsToDf(q1))
+}
+```
+
+
+# Sentiment score
+After having my text stored in the server, I use the query function to get my sentence-level data. Then I use functions in the sentimentr package to calculate the sentence-level sentiment scores while making the following plots.
+
+In the first graph, I plot the sentiment score for each sentence in the article, the x axis is the ordinal sentence ID which represents the order each sentence showing up in the story. However, since there are over 2000 sentences, the graph looks a little bit wild and we cannot find a overall pattern
+
+In the second plot, I put 10 consecutive sentences into a chunk and plot the sum of their sentiment scores. The x axis is the chunk Id, where larger ID means the showing up later in the story. As we can see, there are less bars here and we can distinguish an overall pattern relatively easier.
+
+In the third graph, rather than group by consecutive 10 sentences, I group them by the paragraph they live in and make the plot. And we can see that there is not much difference between the 10-sentences graph and this one, they share the same overall pattern.
+
+```{r, echo = F, warning = F, message = F}
+# query the data in sentence level
+all_text <- tqury("xihao/hw4_v2/# has text", 15000)
+all_head <- tqury("xihao/hw4_v2/heading# has text", 15000)
+all_text <- all_text %>% select(subject, string.value) %>% mutate(order = row_number(), section = str_sub(all_text$subject, 14, 25), paragraph = str_sub(all_text$subject, 27, 40), sentence = str_sub(all_text$subject, 42, 54)) 
+
+all_sent_score <- get_sentences(all_text) %>% sentiment()
+```
+
+
+```{r, echo = F, warning = F, message = F}
+# on 10 sentences level
+p10 <- all_sent_score %>% mutate(index = order %/% 10) %>% group_by(index) %>% summarize(score = sum(sentiment, na.rm = T)) %>% ggplot(aes(x = index, y = score)) + geom_col(aes(fill = index), show.legend = F) + labs(x = 'chunks', y = 'sentiment score', title = 'sentiment score across the article on 10 sentences level')
+
+# make bar chart across the story on sentence level
+p1 <- all_sent_score %>% ggplot(aes(x = element_id, y = sentiment)) + geom_col(aes(fill = element_id), show.legend = F) + labs(x = 'sentence_ID', y = 'sentiment score', title = 'sentiment score across the article on single sentence level')
+
+# make bar chart across the story on paragraph level
+p100 <- all_sent_score %>% group_by(paragraph) %>% summarize(score = sum(sentiment, na.rm = T)) %>% ggplot(aes(x = paragraph, y = score)) + geom_col(aes(fill = paragraph), show.legend = F) + labs(x = 'paragraph', y = 'sentiment score', title = 'sentiment score across the article on paragraph level') + scale_x_discrete(labels = NULL)
+```
+
+
+```{r, fig.width= 18, echo = F, warning = F, message = F, fig.height = 7}
+grid.arrange(p1, p10, p100, ncol = 3)
+```
+\
+
+# Compare the token-level and sentence-level sentiment scores across the story
+In the token-level report, I use four different lexicon engines to illustrate the sentiment scores/proportion across the story on the token-level. Now I have the sentence-level sentiment score across the story, I want to make a comparison between the sentence-level and token-level. I will only use the bing and afinn lexicon engines since they also use numerical value to quantify the sentiment. One thing needs notice is that in the token-level graphs, each chunk contains 80 consecutive words.
+
+```{r, echo = F, warning = F, message = F}
+# download the book
+data <- gutenberg_download(c(244))
+# make the text tidy (have excluded stop words)
+scarlet <- data %>%
+  mutate(linenumber = row_number(),
+         chapter = cumsum(str_detect(text, regex("^chapter [\\divxlc]",
+                                                 ignore_case = TRUE)))) %>%
+  unnest_tokens(word, text) %>%
+  anti_join(stop_words)# download the book
+data <- gutenberg_download(c(244))
+
+# make the text tidy (have excluded stop words)
+scarlet <- data %>%
+  mutate(linenumber = row_number(),
+         chapter = cumsum(str_detect(text, regex("^chapter [\\divxlc]",
+                                                 ignore_case = TRUE)))) %>%
+  unnest_tokens(word, text) %>%
+  anti_join(stop_words)
+
+# do the sentiment analysis using Bing lexicon engine
+bing <- get_sentiments('bing')
+scarlet_bing <- inner_join(scarlet, bing) %>% mutate(index = linenumber %/% 80)
+index_bing <- scarlet_bing %>% group_by(index) %>%
+              mutate(whether = ifelse(sentiment == 'positive', 1, -1)) %>% 
+              summarize(value = sum(whether))
+s2 <- ggplot(data = index_bing, mapping = aes(x=index, y=value)) + geom_col(aes(fill=index), show.legend = F) +
+  labs(title='the bing lexicon sentiment scores across the article', x = 'chunks', y = 'score') +
+  geom_smooth(se = F, color='orange', size = 1.5)
+
+# do the sentiment analysis using afinn engine
+afinn <- get_sentiments('afinn')
+scarlet_afinn <- inner_join(scarlet, afinn) %>% mutate(index = linenumber %/% 80)
+
+index_afinn <- scarlet_afinn %>% group_by(index) %>% summarize(value = sum(value))
+s3 <- ggplot(data = index_afinn, mapping = aes(x=index, y=value)) + geom_col(aes(fill=index), show.legend = F) +
+  labs(title='the afinn lexicon sentiment scores across the article', x = 'chunks', y = 'score') + 
+  geom_smooth(se = F, color='orange', size = 1.5)
+```
+
+```{r, echo = F, warning = F, message = F, fig.width = 16, fig.height = 12}
+grid.arrange(s2, s3, p1, p10, ncol = 2)
+```
+It seems that the sentence-level and token-level graphs do not share the same shape. I guess the reason is that the sentimentr package has its own formula to calculate the sentiment score of a sentence rather than simply sum the sentiment scores of all words in that sentence.
+\
+\
+
+# Plot the Emotion Valence versus Duration
+```{r, echo = F, warning = F, message = F}
+plot(all_sent_score)
+```
+\
+\
+
+# Reference
+1. Wikipedia: https://en.wikipedia.org/wiki/A_Study_in_Scarlet
+2. Baker Street website: https://bakerstreet.fandom.com/wiki/A_Study_in_Scarlet
+3. TextMining book: https://www.tidytextmining.com/sentiment.html
+4. Sentimentr package manual: https://learn.bu.edu/bbcswebdav/pid-9886265-dt-content-rid-63157069_1/xid-63157069_1
+
+
+
+
+
+
+
+
+
+
+
