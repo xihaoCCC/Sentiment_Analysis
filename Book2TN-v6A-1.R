@@ -1,8 +1,16 @@
+# This file includes two helper function for reading Truenumbers from 
+# a book (vector of character strings).
 
 
-
+# Importation
 library(stringr)
 
+
+# A helper function to generate certain zeros before the given number
+# @param num: the given number that will be added zeros in the front
+# @param digs: the number of digits of the returned value
+# @return: the num with digs - (length of num) many zeros added in the front
+# @example: nDigitString(1234, 6) -> 001234
 nDigitString <- function(num, digs) {
   st <- as.character(num)
   zeros <- digs - str_length(st)
@@ -12,8 +20,8 @@ nDigitString <- function(num, digs) {
   return(st)
 }
 
-#' Title Truenumbers from a book (vector of character strings)
-#'
+
+#' A helper function to read texts in a book
 #' @param theBook, book structure as found in janeaustenR
 #' @param subjectRoot, name of the book
 #' @param line number to begin, so front matter can be skipped
@@ -36,9 +44,7 @@ nDigitString <- function(num, digs) {
 #'
 #' Sentences will have a TN for their, text, word count, and ordinal.  Headings will only have their
 #' text and ordinal.
-#'
-#' @export
-#'
+
 tnBooksFromLines <- function(theBook, subjectRoot, startLine = 1) {
   sentence <- ""    # this variable accumulates a sentence across line boundaries
   sentencenum <- 0  # keeps track of the sentence number within a paragraph
