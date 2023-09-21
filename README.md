@@ -9,12 +9,18 @@ I employed a range of tools and visual techniques to explore the novel's word-se
 The analysis utilizes four widely recognized text mining lexicon engines: afinn, NRC, bing, and loughran. Each of these engines
 offers distinct sentiment keyword categories and methodologies to examine the positivity of words.
 
-## Installation
-This project is developed using Python 3. Refer to `main.ipynb` for the required packages.
+
+## Setup
+Ensure you have **R**, **RStudio**, and **LaTeX** installed. Install the R packages mentioned in `sentence_report.Rmd` and `token_report.Rmd`. 
+Two notable packages include:
+- **gutenbergr**: Provides access to the Gutenberg library, which contains over 70,000 free eBooks.
+- **tnum**: Developed by Boston University professors for vectorized parsing of extensive texts. This package requires users to have access to the Boston University server.
+
+After setting up the packages, open the `.Rmd` files in RStudio and use the `knit` function to generate the respective reports in PDF format.
 
 
 ## File Descriptions
-- `main.ipynb`: Python notebook responsible for data generation and model construction.
+- `a_study_in_scarlet.txt`: The text data of the book which I downloaded from 
 - `fit_gaussian.html`: HTML export of the `main.ipynb` notebook.
 - `presentation.mp4`: A brief video presentation discussing the work and key concepts of the project.
 
